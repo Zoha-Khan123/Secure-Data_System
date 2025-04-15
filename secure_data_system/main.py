@@ -1,6 +1,7 @@
 import streamlit as st
 import hashlib
 from cryptography.fernet import Fernet
+import pandas as pd
 
 # Initialize session state variables
 if "fernet_key" not in st.session_state:
@@ -23,17 +24,25 @@ if 'failed_attempts' not in st.session_state:
     st.session_state.failed_attempts = 0
 
 
+
+
 # Hashing function
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
+
+
 
 # Encryption function
 def encrypt_data(text):
     return cipher.encrypt(text.encode()).decode()
 
+
+
 # Decryption Function
 def decrypt_data(encrypted_text):
     return cipher.decrypt(encrypted_text.encode()).decode()
+
+
 
 
 # Sign Up Function
@@ -73,6 +82,10 @@ def sign_up():
         st.rerun()
 
 
+
+
+
+
 # Login Function
 def login():
     st.title("🔐 :rainbow[Login] 🔐")
@@ -102,16 +115,25 @@ def login():
         st.rerun()
 
 
+
+
+
+
 # Dashboard Function
-def show_dashboard():
+def show_dashboard(user_id):
     st.title("🎉 :rainbow[Dashboard] ")
     st.header(f":rainbow[Welcome, {st.session_state.current_user}! ]🌟")
     insert_data()
+    insert_data_table(user_id)
     retrieved_data()
     logout()
 
 
-# Insert Data Function
+
+
+
+
+# Insert data
 def insert_data():
     with st.form("insert_data"):
         user_id = st.session_state.current_user
@@ -122,21 +144,65 @@ def insert_data():
         submitted = st.form_submit_button("Insert Data")
 
         if submitted:
-                if insert_text and insert_passkey:
-                    new_entry = {
-                        "insert_passkey" : hashed_passkey,
-                        "insert_text" : encrypted_text
-                    }
+            if insert_text and insert_passkey:
+                # Check if user_id exists in stored_data
+                if user_id in st.session_state.stored_data:
+                    # Check if the passkey already exists for this user
+                    for entry in st.session_state.stored_data[user_id]:
+                        if insert_passkey == entry["display_passkey"] or hashed_passkey == entry["insert_passkey"]:
+                            st.error("You cannot insert data with the same passkey.")
+                            return
 
-                    if user_id in st.session_state.stored_data:
-                        st.session_state.stored_data[user_id].append(new_entry)
-                    else:
-                        st.session_state.stored_data[user_id] = [new_entry]
-                    # st.write(st.session_state.stored_data)
-                    st.success("📥 Data stored successfully!")   
+                # Create a new entry
+                new_entry = {
+                    "insert_passkey": hashed_passkey,
+                    "insert_text": encrypted_text,
+                    "display_text": insert_text,
+                    "display_passkey": insert_passkey
+                }
+
+                # Add the new entry to the user's data
+                if user_id in st.session_state.stored_data:
+                    st.session_state.stored_data[user_id].append(new_entry)
                 else:
-                    st.error("❌ All fields are required!")
-           
+                    st.session_state.stored_data[user_id] = [new_entry]
+
+                st.success("📥 Data stored successfully!")
+            else:
+                st.error("❌ All fields are required!")
+
+
+
+
+
+
+def insert_data_table(user_id):
+    # Check if user has inserted any data
+    if user_id in st.session_state.stored_data and st.session_state.stored_data[user_id]:
+        user_entries = st.session_state.stored_data[user_id]
+
+        # Show only plain text and plain passkey
+        display_data = []
+        for entry in user_entries:
+            display_data.append({
+                "Text": entry["display_text"],
+                "Passkey": entry["display_passkey"]
+            })
+
+        # Convert the list into a DataFrame
+        df = pd.DataFrame(display_data)
+        st.write("📄 All Inserted Data for This User:")
+        st.dataframe(df)
+    else:
+        # Show this message only if data insertion has been attempted
+        if "data_inserted" in st.session_state and st.session_state.data_inserted:
+            st.info("🗃️ No data found for this user.")
+
+
+
+
+
+
 # Retrieve Data Function
 def retrieved_data():
     with st.form("retrieved_data"):
@@ -174,6 +240,10 @@ def retrieved_data():
                 st.session_state.failed_attempts = 0  # Reset failed attempts
                 st.rerun()
 
+
+
+
+
 # Logout Function
 def logout():
     if st.button("🔓 Logout"):
@@ -190,4 +260,4 @@ if st.session_state.page == 'signup':
 elif st.session_state.page == 'login':
     login()
 elif st.session_state.page == 'dashboard' and st.session_state.logged_in:
-    show_dashboard()
+    show_dashboard(st.session_state.current_user)
